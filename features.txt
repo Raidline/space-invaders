@@ -5,4 +5,6 @@ This should follow the standard space invaders rules, if the alien reaches the e
 - The player should have 3 lives.
 - We should have multiple aliens
 - There should be multiple types of aliens. TBD
-- The shooter should have protections in front that get weaker as they get hit
+- The shooter should have protections in front that get weaker as they get hit.
+- Create a custom profiler to verify cpu and memory usage
+- Improve memory and cpu usage
