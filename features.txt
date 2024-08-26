@@ -1,0 +1,8 @@
+Features to build:
+
+- 1:1 game, i want to build a game where we only have the shooter and the alien.
+This should follow the standard space invaders rules, if the alien reaches the end of the screen the game ends.
+- The player should have 3 lives.
+- We should have multiple aliens
+- There should be multiple types of aliens. TBD
+- The shooter should have protections in front that get weaker as they get hit
