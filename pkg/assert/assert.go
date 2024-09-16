@@ -1,10 +1,22 @@
 package assert
 
-import "raidline/space-invaders/pkg/logger"
+import (
+	"fmt"
+	"raidline/space-invaders/pkg/logger"
+)
 
 func Assert(condition bool, msg string, values ...interface{}) {
 	if !condition {
-		logger.Error(msg)
+
+		var formattedMsg string
+
+		if len(values) != 0 {
+			formattedMsg = fmt.Sprintf(msg, values)
+		} else {
+			formattedMsg = msg
+		}
+
+		logger.Error(formattedMsg)
 		panic(msg)
 	}
 }

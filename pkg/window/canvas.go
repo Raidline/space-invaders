@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"raidline/space-invaders/pkg/assert"
 	"raidline/space-invaders/pkg/colors"
+	"raidline/space-invaders/pkg/logger"
 )
 
 const MaxRows = 128
@@ -29,11 +31,14 @@ type Canvas struct {
 	drawBuf *bytes.Buffer
 }
 
-const Wall = "\u2588"
+const wall = "\u2588"
+const aircraft = "|\n   --=O=--"
 
 func Make(rows, cols int) *Canvas {
-	assert.Assert(rows < MaxRows, "Rows should be no bigger than", MaxRows)
-	assert.Assert(cols < MaxCols, "Cols should be no bigger than", MaxCols)
+	tr, tc := getTerminalSize()
+
+	assert.Assert(rows < tr, "Rows should be no bigger than %d, current terminal row size is %d", tr)
+	assert.Assert(cols < tc, "Cols should be no bigger than %d, current terminal cols size is %d", tc)
 
 	cells := constructBoard(rows, cols)
 	return &Canvas{
@@ -44,38 +49,71 @@ func Make(rows, cols int) *Canvas {
 	}
 }
 
-func (c *Canvas) Clear() {
-	c.field = constructBoard(c.rows, c.cols)
-	c.Draw()
+func getTerminalSize() (int, int) {
+	// Default terminal size
+	rows, cols := -1, -1
+
+	// Use the stty command to get the terminal size
+	cmd := exec.Command("stty", "size")
+	cmd.Stdin = os.Stdin
+	out, err := cmd.Output()
+	if err != nil {
+		logger.Warn("Could not open output to cmd")
+	}
+
+	_, scanErr := fmt.Sscanf(string(out), "%d %d", &rows, &cols)
+
+	if scanErr != nil {
+		logger.Warn("Could not get the terminal size, will continue with default values")
+	}
+
+	if rows == -1 || cols == -1 {
+		return MaxRows, MaxCols
+	}
+
+	return rows, cols
 }
 
-func (c *Canvas) Draw() {
+func (c *Canvas) Clear() {
+	c.field = constructBoard(c.rows, c.cols)
+	c.Draw(0)
+}
+
+// todo: not happy with passing it like this... i would like to receive a struct with all the engine stats..
+// todo: the problem is that the engine needs to call the canvas to draw.. we need to split the circular calling
+func (c *Canvas) Draw(fps float64) {
 	c.drawBuf.Reset()
-	// Clear the screen
-	_, _ = fmt.Fprint(os.Stdout, "\033[2J")
-	// Move the cursor to the home position
-	_, _ = fmt.Fprint(os.Stdout, "\033[H")
+	// flush the terminal and go to the top
+	_, err := fmt.Fprint(os.Stdout, "\x1b[H\x1b[J")
+	if err != nil {
+		logger.Error(err.Error())
+	}
 	c.printBoard()
-	c.printStats()
+	c.drawStats(fps)
+
+	_, printErr := fmt.Fprintf(os.Stdout, c.drawBuf.String())
+	assert.Assert(printErr == nil, "We should be able to print the game onto screen")
 }
 
 func (c *Canvas) printBoard() {
 	for _, cells := range c.field {
 		for _, cell := range cells {
 			if !cell.Valid {
-				c.drawBuf.WriteString(Wall)
+				c.drawBuf.WriteString(wall)
 			} else {
 				c.drawBuf.WriteString(" ")
 			}
 		}
 		c.drawBuf.WriteString("\n")
 	}
-	_, err := fmt.Fprintf(os.Stdout, c.drawBuf.String())
-	assert.Assert(err == nil, "We should be able to print the game onto screen")
 }
 
-func (c *Canvas) printStats() {
-
+func (c *Canvas) drawStats(fps float64) {
+	_, _ = c.drawBuf.WriteString("--FPS\n")
+	_, err := c.drawBuf.WriteString(fmt.Sprintf("FPS: %.2f", fps))
+	if err != nil {
+		logger.Error("Error printing engine stats %s", err.Error())
+	}
 }
 
 func constructBoard(rows, cols int) [][]Cell {
