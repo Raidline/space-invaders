@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	c := window.Make(50, 120)
+	c := window.Make()
 	eng := engine.Make(c)
 	eng.Run()
 }

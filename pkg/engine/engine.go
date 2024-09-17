@@ -40,6 +40,7 @@ func Make(w *window.Canvas) *Engine {
 }
 
 func (e *Engine) Run() {
+	e.canvas.Flush()
 	for e.running {
 		e.frames++
 		e.calculateFps()

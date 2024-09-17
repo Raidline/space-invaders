@@ -3,19 +3,22 @@ package window
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"raidline/space-invaders/pkg/assert"
 	"raidline/space-invaders/pkg/colors"
 	"raidline/space-invaders/pkg/logger"
+	"strconv"
+	"syscall"
+	"unsafe"
 )
 
 const MaxRows = 128
 const MaxCols = 128
 
 type PixelPoint struct {
-	x int
-	y int
+	pixelR int
+	pixelC int
 }
 
 type Cell struct {
@@ -26,90 +29,116 @@ type Cell struct {
 
 type Canvas struct {
 	field   [][]Cell
-	rows    int
-	cols    int
 	drawBuf *bytes.Buffer
+	ws      *winsize
+}
+
+type winsize struct {
+	Row uint16
+	Col uint16
 }
 
 const wall = "\u2588"
-const aircraft = "|\n   --=O=--"
+const aircraft = "/\\\t\n      /  \\\n\t / /\\ \\ \t\n\t/_/  \\_\\"
 
-func Make(rows, cols int) *Canvas {
-	tr, tc := getTerminalSize()
+func Make() *Canvas {
+	ws := getWinsize()
 
-	assert.Assert(rows < tr, "Rows should be no bigger than %d, current terminal row size is %d", tr)
-	assert.Assert(cols < tc, "Cols should be no bigger than %d, current terminal cols size is %d", tc)
+	//todo: stats takes 2 lines (we should have this calculated)
+	cells := constructBoard(int(ws.Row-2), int(ws.Col))
 
-	cells := constructBoard(rows, cols)
+	// todo: we need to listen for the control+c so we can reset the behaviour
+	//_, err := fmt.Fprint(os.Stdout, "\x1b[?25l") // hide the cursor
+	//
+	//// \x1b[?12l\x1b[?25h -> shows the cursor
+	//
+	//if err != nil {
+	//	logger.Warn("Cursor could not be hidden, will be shown")
+	//}
 	return &Canvas{
 		field:   cells,
-		rows:    rows,
-		cols:    cols,
+		ws:      ws,
 		drawBuf: new(bytes.Buffer),
 	}
 }
 
-func getTerminalSize() (int, int) {
-	// Default terminal size
-	rows, cols := -1, -1
+func getWinsize() *winsize {
 
-	// Use the stty command to get the terminal size
-	cmd := exec.Command("stty", "size")
-	cmd.Stdin = os.Stdin
-	out, err := cmd.Output()
+	ws := &winsize{}
+	retCode, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
+		uintptr(syscall.Stdin),
+		uintptr(syscall.TIOCGWINSZ),
+		uintptr(unsafe.Pointer(ws)))
+
+	if int(retCode) == -1 {
+		logger.Error("Could not get terminal information")
+		panic(errno)
+	}
+
+	if ws.Row <= 0 {
+		ws.Row = MaxRows
+	}
+
+	if ws.Col <= 0 {
+		ws.Col = MaxCols
+	}
+
+	return ws
+}
+
+func (c *Canvas) Flush() {
+	_, err := fmt.Fprint(os.Stdout, "\x1b[H\x1b[2J")
 	if err != nil {
-		logger.Warn("Could not open output to cmd")
+		logger.Error(err.Error())
 	}
-
-	_, scanErr := fmt.Sscanf(string(out), "%d %d", &rows, &cols)
-
-	if scanErr != nil {
-		logger.Warn("Could not get the terminal size, will continue with default values")
-	}
-
-	if rows == -1 || cols == -1 {
-		return MaxRows, MaxCols
-	}
-
-	return rows, cols
 }
 
 func (c *Canvas) Clear() {
-	c.field = constructBoard(c.rows, c.cols)
-	c.Draw(0)
+	c.Flush()
+	c.drawBuf.Reset()
 }
 
 // todo: not happy with passing it like this... i would like to receive a struct with all the engine stats..
 // todo: the problem is that the engine needs to call the canvas to draw.. we need to split the circular calling
 func (c *Canvas) Draw(fps float64) {
-	c.drawBuf.Reset()
 	// flush the terminal and go to the top
-	_, err := fmt.Fprint(os.Stdout, "\x1b[H\x1b[J")
-	if err != nil {
-		logger.Error(err.Error())
-	}
+	c.drawBuf.WriteString("\x1b[?25l")
 	c.printBoard()
 	c.drawStats(fps)
 
-	_, printErr := fmt.Fprintf(os.Stdout, c.drawBuf.String())
+	_, printErr := io.Copy(os.Stdout, c.drawBuf)
+	c.drawBuf.Reset()
 	assert.Assert(printErr == nil, "We should be able to print the game onto screen")
+}
+
+var intbuf = make([]byte, 0, 16)
+
+func (c *Canvas) writeCursor(r, col int) {
+	c.drawBuf.WriteString("\033[")
+	c.drawBuf.Write(strconv.AppendUint(intbuf, uint64(r+1), 10))
+	c.drawBuf.WriteString(";")
+	c.drawBuf.Write(strconv.AppendUint(intbuf, uint64(col+1), 10))
+	c.drawBuf.WriteString("H")
 }
 
 func (c *Canvas) printBoard() {
 	for _, cells := range c.field {
 		for _, cell := range cells {
+			c.writeCursor(cell.Position.pixelR, cell.Position.pixelC)
 			if !cell.Valid {
 				c.drawBuf.WriteString(wall)
 			} else {
 				c.drawBuf.WriteString(" ")
 			}
 		}
-		c.drawBuf.WriteString("\n")
 	}
 }
 
 func (c *Canvas) drawStats(fps float64) {
-	_, _ = c.drawBuf.WriteString("--FPS\n")
+	fpsR := int(c.ws.Row)
+	c.writeCursor(fpsR-2, 0) // this is basically the line of the last cell column (because it's exclusive values)
+	_, _ = c.drawBuf.WriteString("--FPS")
+	c.writeCursor(fpsR-1, 0)
 	_, err := c.drawBuf.WriteString(fmt.Sprintf("FPS: %.2f", fps))
 	if err != nil {
 		logger.Error("Error printing engine stats %s", err.Error())
@@ -126,8 +155,8 @@ func constructBoard(rows, cols int) [][]Cell {
 				cells[i][j] = Cell{
 					Color: colors.DarkGray,
 					Position: PixelPoint{
-						x: i,
-						y: j,
+						pixelR: i,
+						pixelC: j,
 					},
 					Valid: false,
 				}
@@ -136,8 +165,8 @@ func constructBoard(rows, cols int) [][]Cell {
 				cells[i][j] = Cell{
 					Color: colors.Black,
 					Position: PixelPoint{
-						x: i,
-						y: j,
+						pixelR: i,
+						pixelC: j,
 					},
 					Valid: true,
 				}
