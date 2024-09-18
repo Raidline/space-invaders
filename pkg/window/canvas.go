@@ -145,6 +145,8 @@ func (c *Canvas) drawStats(fps float64) {
 	}
 }
 
+// todo: this should probably be done a folder for the game. The engine should just be worried about running the game
+// the canvas should know what to do with which piece
 func constructBoard(rows, cols int) [][]Cell {
 	cells := make([][]Cell, rows)
 	for i := 0; i < rows; i++ {
