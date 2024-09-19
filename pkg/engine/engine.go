@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"raidline/space-invaders/game"
 	"raidline/space-invaders/pkg/window"
 	"time"
 )
@@ -23,14 +24,16 @@ func (e *Engine) calculateFps() {
 type Engine struct {
 	frames  int
 	canvas  *window.Canvas
+	game    *game.Game
 	stats   stats
 	running bool
 }
 
-func Make(w *window.Canvas) *Engine {
+func Make(w *window.Canvas, g *game.Game) *Engine {
 	return &Engine{
 		frames: 0,
 		canvas: w,
+		game:   g,
 		stats: stats{
 			start: time.Now(),
 			fps:   0,
@@ -44,7 +47,7 @@ func (e *Engine) Run() {
 	for e.running {
 		e.frames++
 		e.calculateFps()
-		e.canvas.Draw(e.stats.fps)
+		e.canvas.Draw(e.stats.fps, e.game.Board)
 		time.Sleep(time.Millisecond * 13)
 	}
 }
