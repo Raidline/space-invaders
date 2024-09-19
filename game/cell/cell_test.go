@@ -2,8 +2,7 @@ package cell
 
 import (
 	"bytes"
-	"fmt"
-	"os"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -11,15 +10,29 @@ func TestFillShipPositions(t *testing.T) {
 
 	//todo: not working!!
 	t.Run("Should create an array of positions for the ship", func(t *testing.T) {
-		positions := fillShipPositions(2, 1, 20, 20)
+		rows := 10
+		cols := 10
+		positions := fillShipPositions(2, 1, rows, cols)
 
 		shipDraw := new(bytes.Buffer)
 
-		board := make([][]bool, 20)
+		board := make([][]bool, rows)
 
-		for i := 0; i < 20; i++ {
-			board[i] = make([]bool, 20)
-			for j := 0; j < 20; j++ {
+		wantedStr := `..........
+..........
+..........
+..........
+....x.....
+...xxx....
+..xx.xx...
+..........
+..........
+..........
+`
+
+		for i := 0; i < rows; i++ {
+			board[i] = make([]bool, cols)
+			for j := 0; j < cols; j++ {
 				if isFoundInPositions(positions, i, j) {
 					board[i][j] = true
 				} else {
@@ -36,9 +49,10 @@ func TestFillShipPositions(t *testing.T) {
 					shipDraw.WriteString(".")
 				}
 			}
+			shipDraw.WriteString("\n")
 		}
 
-		_, _ = fmt.Fprintf(os.Stdout, shipDraw.String())
+		assert.Equal(t, wantedStr, shipDraw.String())
 	})
 }
 
