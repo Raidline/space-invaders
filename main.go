@@ -1,7 +1,7 @@
 package main
 
 import (
-	"raidline/space-invaders/game/cell"
+	"raidline/space-invaders/game"
 	"raidline/space-invaders/pkg/engine"
 	"raidline/space-invaders/pkg/logger"
 	"raidline/space-invaders/pkg/window"
@@ -21,7 +21,7 @@ func main() {
 	ws := getWinsize()
 
 	c := window.Make(ws.Row, ws.Col)
-	g := cell.Make(ws.Row, ws.Col)
+	g := game.Make(ws.Row, ws.Col)
 	eng := engine.Make(c, g)
 	eng.Run()
 }
