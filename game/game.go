@@ -3,21 +3,24 @@ package game
 import (
 	"raidline/space-invaders/game/cell"
 	"raidline/space-invaders/pkg/assert"
+	"raidline/space-invaders/pkg/logger"
 )
 
 const (
-	shipSideSize int = 5
-	enemyLength      = 3
-	topEnemyLine     = 2
-	enemyMargin      = 10
-	enemyWidth       = 7
-	wallMargin       = 50
+	shipSideSize         int = 5
+	enemyLength              = 3
+	topEnemyLine             = 2
+	enemyMargin              = 10
+	enemyWidth               = 7
+	enemyDescendingTicks     = 10
 )
 
 type Game struct {
-	Board   [][]BoardPoint
-	enemies []*cell.Enemy
-	ship    *cell.Ship
+	Board       [][]BoardPoint
+	TickChan    <-chan bool
+	enemies     []*cell.Enemy
+	ship        *cell.Ship
+	enemyTicker int
 }
 
 type BoardPoint struct {
@@ -25,7 +28,7 @@ type BoardPoint struct {
 	C     cell.Cell
 }
 
-func Make(rows, cols uint16) *Game {
+func Make(rows, cols uint16, tickChan <-chan bool) *Game {
 	r := int(rows)
 	c := int(cols)
 	b := constructBoard(r, c)
@@ -35,10 +38,63 @@ func Make(rows, cols uint16) *Game {
 
 	placeCellsInBoard(b, enemies, ship)
 
-	return &Game{
-		Board:   b,
-		enemies: enemies,
-		ship:    ship,
+	g := &Game{
+		Board:       b,
+		enemies:     enemies,
+		ship:        ship,
+		TickChan:    tickChan,
+		enemyTicker: 0,
+	}
+
+	go g.enemyMoverTicker()
+
+	return g
+}
+
+func (g *Game) enemyMoverTicker() {
+	for tick := range g.TickChan {
+
+		assert.Assert(tick, "We should never receive false for the tick channel")
+
+		g.enemyTicker++
+		if g.enemyTicker == enemyDescendingTicks {
+			g.enemyTicker = 0
+			for _, enemy := range g.enemies {
+				cannonShipPos := g.ship.Positions[0]
+
+				//todo: signal game end
+				lastR := enemy.Positions[len(enemy.Positions)-1].PixelR + 1
+
+				if lastR == g.ship.Positions[0].PixelR {
+					logger.Error("GAME ENDED %s", "shame")
+				}
+
+				newPositions := make([]*cell.PixelPoint, len(enemy.Positions))
+				for i, position := range enemy.Positions {
+					prevR := position.PixelR
+					prevC := position.PixelC
+
+					g.Board[prevR][prevC] = createEmptyPoint()
+
+					newPositions[i] = &cell.PixelPoint{
+						PixelR: prevR + 1,
+						PixelC: prevC,
+					}
+				}
+
+				enemy.Positions = nil
+				enemy.Positions = newPositions
+
+				for _, position := range enemy.Positions {
+					assert.Assert(position.PixelR < cannonShipPos.PixelR, "You cannot move past the cannon of the ship Line %d", cannonShipPos.PixelR)
+					g.Board[position.PixelR][position.PixelC] = BoardPoint{
+						Valid: true,
+						C:     enemy,
+					}
+				}
+
+			}
+		}
 	}
 }
 
@@ -68,6 +124,7 @@ func createEnemies(cols int) []*cell.Enemy {
 func placeCellsInBoard(b [][]BoardPoint, enemies []*cell.Enemy, ship *cell.Ship) {
 
 	for _, enemy := range enemies {
+		assert.NonNil(enemy)
 		for _, position := range enemy.Positions {
 			b[position.PixelR][position.PixelC] = BoardPoint{
 				Valid: true,
@@ -77,6 +134,7 @@ func placeCellsInBoard(b [][]BoardPoint, enemies []*cell.Enemy, ship *cell.Ship)
 	}
 
 	for _, position := range ship.Positions {
+		assert.NonNil(position)
 		b[position.PixelR][position.PixelC] = BoardPoint{
 			Valid: true,
 			C:     ship,
@@ -150,15 +208,19 @@ func constructBoard(rows, cols int) [][]BoardPoint {
 					C:     nil,
 				}
 			} else {
-				outerBoard[i][j] = BoardPoint{
-					Valid: true,
-					C:     nil,
-				}
+				outerBoard[i][j] = createEmptyPoint()
 			}
 		}
 	}
 
 	return outerBoard
+}
+
+func createEmptyPoint() BoardPoint {
+	return BoardPoint{
+		Valid: true,
+		C:     nil,
+	}
 }
 
 // could be a "static" method (could help in collision detection)

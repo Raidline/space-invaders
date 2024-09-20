@@ -21,8 +21,11 @@ func main() {
 	ws := getWinsize()
 
 	c := window.Make(ws.Row, ws.Col)
-	g := game.Make(ws.Row-2, ws.Col)
-	eng := engine.Make(c, g)
+	eng := engine.Make(c)
+
+	g := game.Make(ws.Row-2, ws.Col, eng.FramesChan)
+
+	eng.SetGame(g)
 	eng.Run()
 }
 

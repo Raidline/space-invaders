@@ -14,13 +14,13 @@ func colorize(color, message string) string {
 
 func Error(msg string, values ...interface{}) {
 	errMsg := fmt.Sprintf(errorPrefix, fmt.Sprintf(msg, values))
-	log.Fatal(colorize(colors.Red, errMsg))
+	log.Println(colorize(colors.Red, errMsg))
 }
 
 func Warn(msg string) {
-	log.Print(colorize(colors.Blue, msg))
+	log.Println(colorize(colors.Blue, msg))
 }
 
 func Debug(msg string, values ...interface{}) {
-	log.Print(colorize(colors.Green, fmt.Sprintf(msg, values)))
+	log.Println(colorize(colors.Green, fmt.Sprintf(msg, values)))
 }
