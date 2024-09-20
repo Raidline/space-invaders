@@ -1,102 +1,89 @@
 package cell
 
-type Ship struct {
-	positions []*pixelPoint // the first position is of the cannon
+type Cell interface {
+	Print(i, j int) string
+	IsFoundInPositions(i, j int) bool //todo: we are doing for loops.. maybe we could have a map of some kind to make the search faster?
 }
 
-func MakeShip(sideSize, lowerSize, rows, cols int) *Ship {
+type PixelPoint struct {
+	PixelR int
+	PixelC int
+}
+
+type Ship struct {
+	Positions []*PixelPoint // the first position is of the cannon
+}
+
+func MakeShip(positions []*PixelPoint) *Ship {
 	return &Ship{
-		positions: fillShipPositions(sideSize, lowerSize, rows, cols),
+		Positions: positions,
 	}
 }
-
-//should be in canvas??
 
 // Print gives the correct char for the position, in order to be drawn
-func (s *Ship) Print(i, j int) {
-
+func (s *Ship) Print(i, j int) string {
+	return "@"
 }
 
-type Cell interface {
-	Print(i, j int)
+func (s *Ship) IsFoundInPositions(i int, j int) bool {
+	for _, position := range s.Positions {
+		if position.PixelR == i && position.PixelC == j {
+			return true
+		}
+	}
+
+	return false
 }
 
-type pixelPoint struct {
-	pixelR int
-	pixelC int
+// We could have multiple types of enemies in the future
+
+type Enemy struct {
+	Positions []*PixelPoint
 }
 
-func fillShipPositions(sideSize, lowerSize, rows, cols int) []*pixelPoint {
-	positions := make([]*pixelPoint, (sideSize*2)+(lowerSize*4)+1)
-	posIdx := 0
-	midPoint := cols / 2
-	lowerPoint := rows - 5
-
-	//cannon
-	cannonR := lowerPoint - sideSize
-	positions[posIdx] = &pixelPoint{
-		pixelR: cannonR,
-		pixelC: midPoint,
+func MakeEnemy(positions []*PixelPoint) *Enemy {
+	return &Enemy{
+		Positions: positions,
 	}
+}
 
-	posIdx++
+// Print gives the correct char for the position, in order to be drawn
+func (s *Enemy) Print(i, j int) string {
 
-	//left side
-	for delta := 1; delta <= sideSize; delta++ {
-		positions[posIdx] = &pixelPoint{
-			pixelR: cannonR + delta,
-			pixelC: midPoint - delta,
+	lastPoint := s.Positions[len(s.Positions)-1]
+	firstPoint := s.Positions[0]
+
+	columnBegin := firstPoint.PixelC
+	columnEnd := lastPoint.PixelC
+	width := columnEnd - columnBegin
+
+	rowBegin := firstPoint.PixelR
+	rowEnd := lastPoint.PixelR
+	length := rowEnd - rowBegin
+
+	if (i - rowBegin) == 1 {
+		if j-columnBegin == (width/2)-1 {
+			return "O"
 		}
-		posIdx++
+
+		if j-columnBegin == (width/2)+1 {
+			return "O"
+		}
 	}
 
-	// right side
-	for delta := 1; delta <= sideSize; delta++ {
-		positions[posIdx] = &pixelPoint{
-			pixelR: cannonR + delta,
-			pixelC: midPoint + delta,
-		}
-		posIdx++
+	if (i-rowBegin) == length && j-columnBegin == (width/2) {
+		return "□"
 	}
 
-	lastPosIdx := posIdx - 1
-	// lower left
-	for delta := 1; delta <= lowerSize; delta++ {
-		positions[posIdx] = &pixelPoint{
-			pixelR: positions[lastPosIdx].pixelR,
-			pixelC: positions[lastPosIdx].pixelC + delta,
+	return "."
+}
+
+func (s *Enemy) IsFoundInPositions(i int, j int) bool {
+	for _, position := range s.Positions {
+		if position.PixelR == i && position.PixelC == j {
+			return true
 		}
-		posIdx++
 	}
 
-	lastPosIdx = posIdx - 1
-	//lower left mid
-	for delta := 1; delta <= lowerSize; delta++ {
-		positions[posIdx] = &pixelPoint{
-			pixelR: positions[lastPosIdx].pixelR - delta,
-			pixelC: positions[lastPosIdx].pixelC + delta,
-		}
-		posIdx++
-	}
-	//lower right mid
-	lastPosIdx = posIdx - 1
-	for delta := 1; delta <= lowerSize; delta++ {
-		positions[posIdx] = &pixelPoint{
-			pixelR: positions[lastPosIdx].pixelR + delta,
-			pixelC: positions[lastPosIdx].pixelC + delta,
-		}
-		posIdx++
-	}
-
-	//lower right
-	lastPosIdx = posIdx - 1
-	for delta := 1; delta <= lowerSize; delta++ {
-		positions[posIdx] = &pixelPoint{
-			pixelR: positions[lastPosIdx].pixelR,
-			pixelC: positions[lastPosIdx].pixelC + delta,
-		}
-		posIdx++
-	}
-
-	return positions
+	return false
 }

@@ -21,7 +21,7 @@ func main() {
 	ws := getWinsize()
 
 	c := window.Make(ws.Row, ws.Col)
-	g := game.Make(ws.Row, ws.Col)
+	g := game.Make(ws.Row-2, ws.Col)
 	eng := engine.Make(c, g)
 	eng.Run()
 }

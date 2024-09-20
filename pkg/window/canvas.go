@@ -18,7 +18,6 @@ type Canvas struct {
 }
 
 const wall = "\u2588"
-const aircraft = "/\\\t\n      /  \\\n\t / /\\ \\ \t\n\t/_/  \\_\\"
 
 func Make(row, col uint16) *Canvas {
 	// todo: we need to listen for the control+c so we can reset the behaviour of cursor showing
@@ -69,7 +68,11 @@ func (c *Canvas) printBoard(field [][]game.BoardPoint) {
 			if !b.Valid {
 				c.drawBuf.WriteString(wall)
 			} else {
-				c.drawBuf.WriteString(" ")
+				if b.C == nil {
+					c.drawBuf.WriteString(" ")
+				} else {
+					c.drawBuf.WriteString(b.C.Print(r, col))
+				}
 			}
 		}
 	}

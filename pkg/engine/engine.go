@@ -48,6 +48,5 @@ func (e *Engine) Run() {
 		e.frames++
 		e.calculateFps()
 		e.canvas.Draw(e.stats.fps, e.game.Board)
-		time.Sleep(time.Millisecond * 13)
 	}
 }
