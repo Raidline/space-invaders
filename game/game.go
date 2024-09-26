@@ -3,7 +3,6 @@ package game
 import (
 	"raidline/space-invaders/game/cell"
 	"raidline/space-invaders/pkg/assert"
-	"raidline/space-invaders/pkg/logger"
 )
 
 const (
@@ -15,9 +14,15 @@ const (
 	enemyDescendingTicks     = 10
 )
 
+const (
+	PAUSED int = iota
+	END
+)
+
 type Game struct {
 	Board       [][]BoardPoint
 	TickChan    <-chan bool
+	GameStatus  chan int
 	enemies     []*cell.Enemy
 	ship        *cell.Ship
 	enemyTicker int
@@ -43,6 +48,7 @@ func Make(rows, cols uint16, tickChan <-chan bool) *Game {
 		enemies:     enemies,
 		ship:        ship,
 		TickChan:    tickChan,
+		GameStatus:  make(chan int),
 		enemyTicker: 0,
 	}
 
@@ -52,6 +58,7 @@ func Make(rows, cols uint16, tickChan <-chan bool) *Game {
 }
 
 func (g *Game) enemyMoverTicker() {
+ticker:
 	for tick := range g.TickChan {
 
 		assert.Assert(tick, "We should never receive false for the tick channel")
@@ -62,11 +69,12 @@ func (g *Game) enemyMoverTicker() {
 			for _, enemy := range g.enemies {
 				cannonShipPos := g.ship.Positions[0]
 
-				//todo: signal game end
 				lastR := enemy.Positions[len(enemy.Positions)-1].PixelR + 1
 
 				if lastR == g.ship.Positions[0].PixelR {
-					logger.Error("GAME ENDED %s", "shame")
+					g.GameStatus <- END
+					g.cleanup()
+					break ticker
 				}
 
 				newPositions := make([]*cell.PixelPoint, len(enemy.Positions))
@@ -95,6 +103,13 @@ func (g *Game) enemyMoverTicker() {
 
 			}
 		}
+	}
+}
+
+// cleanup will dispose of any resources that the game is keeping alive (goroutines, e.g)
+func (g *Game) cleanup() {
+	if g.GameStatus != nil {
+		close(g.GameStatus)
 	}
 }
 

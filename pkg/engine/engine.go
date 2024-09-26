@@ -29,6 +29,7 @@ type Engine struct {
 	stats      stats
 	running    bool
 	FramesChan chan bool
+	statesChan <-chan int
 }
 
 func Make(w *window.Canvas) *Engine {
@@ -49,18 +50,30 @@ func Make(w *window.Canvas) *Engine {
 
 func (e *Engine) SetGame(g *game.Game) {
 	e.game = g
+	e.statesChan = g.GameStatus
 }
 
 func (e *Engine) Run() {
 	assert.NonNil(e.game)
 	e.canvas.Flush()
 
+	go func() {
+		for {
+			st := <-e.statesChan
+
+			if st == game.END {
+				e.running = false
+
+				break
+			}
+		}
+	}()
+
 	defer close(e.FramesChan)
 	for e.running {
 		e.frames++
 		e.FramesChan <- true
 		e.calculateFps()
-		//todo: provide a feedback of a tick (or a timer for enemies to go down)
 		e.canvas.Draw(e.stats.fps, e.game.Board)
 	}
 }
